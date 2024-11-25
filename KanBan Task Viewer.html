@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>看板任務檢視器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+        
+        .upload-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .select-container {
+            margin-bottom: 16px;
+        }
+
+        .select-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .custom-select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            margin-bottom: 16px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        .custom-select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .task-container {
+            background-color: white;
+            padding: 16px;
+            border-radius: 4px;
+            margin-top: 16px;
+        }
+
+        .task-item {
+            background-color: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .task-content {
+            white-space: pre-wrap;
+            margin-bottom: 8px;
+        }
+
+        .task-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .task-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        .status-completed {
+            background-color: #e0e0e0;
+            color: #666;
+        }
+
+        .status-in-progress {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .no-tasks {
+            color: #666;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="file" id="fileInput" accept=".json" style="display: none;">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+            選擇看板檔案
+        </button>
+
+        <div class="select-container">
+            <label class="select-label" for="boardSelect">選擇看板：</label>
+            <select id="boardSelect" class="custom-select">
+                <option value="Executing">Executing</option>
+                <option value="Weekly">Weekly</option>
+                <option value="BiWeekly">BiWeekly</option>
+                <option value="Archived">Archived</option>
+            </select>
+        </div>
+
+        <div class="select-container">
+            <label class="select-label" for="categorySelect">選擇分類：</label>
+            <select id="categorySelect" class="custom-select">
+                <option value="all">全部</option>
+                <option value="Y4">Y4</option>
+                <option value="W4">W4</option>
+                <option value="私人">私人</option>
+                <option value="未分類">未分類</option>
+            </select>
+        </div>
+
+        <div id="taskContainer" class="task-container">
+            <div class="no-tasks">請選擇檔案</div>
+        </div>
+    </div>
+
+    <script>
+        let kanbanData = null;
+
+        function formatDate(dateString) {
+            if (!dateString) return '無期限';
+            return new Date(dateString).toLocaleDateString('zh-TW');
+        }
+
+        function updateTaskDisplay() {
+            if (!kanbanData) return;
+
+            const boardSelect = document.getElementById('boardSelect');
+            const categorySelect = document.getElementById('categorySelect');
+            const taskContainer = document.getElementById('taskContainer');
+
+            const selectedBoard = boardSelect.value;
+            const selectedCategory = categorySelect.value;
+
+            // 清空當前顯示
+            taskContainer.innerHTML = '';
+
+            // 獲取選定看板的任務
+            const boardTasks = kanbanData[selectedBoard] || [];
+
+            // 過濾並顯示任務
+            const filteredTasks = boardTasks.filter(task => {
+                if (selectedCategory === 'all') return true;
+                return task.category === selectedCategory;
+            });
+
+            if (filteredTasks.length === 0) {
+                taskContainer.innerHTML = '<div class="no-tasks">無任務</div>';
+                return;
+            }
+
+            // 顯示過濾後的任務
+            filteredTasks.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.className = 'task-item';
+                
+                // 準備狀態標籤
+                let statusHtml = '';
+                if (task.completed) {
+                    statusHtml += '<span class="task-status status-completed">已完成</span>';
+                }
+                if (task.in_progress) {
+                    statusHtml += '<span class="task-status status-in-progress">進行中</span>';
+                }
+
+                taskElement.innerHTML = `
+                    <div class="task-content">${task.content || '無內容'}</div>
+                    <div class="task-meta">
+                        ${statusHtml}
+                        <span>分類: ${task.category || '未分類'}</span>
+                        ${task.due_date ? `<span> | 期限: ${formatDate(task.due_date)}</span>` : ''}
+                        <span> | 建立: ${formatDate(task.created_date)}</span>
+                    </div>
+                `;
+                taskContainer.appendChild(taskElement);
+            });
+        }
+
+        // 監聽檔案選擇
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        kanbanData = JSON.parse(e.target.result);
+                        updateTaskDisplay();
+                    } catch (error) {
+                        document.getElementById('taskContainer').innerHTML = 
+                            '<div class="no-tasks">錯誤：無法解析檔案</div>';
+                    }
+                };
+                
+                reader.readAsText(file);
+            }
+        });
+
+        // 監聽選擇變更
+        document.getElementById('boardSelect').addEventListener('change', updateTaskDisplay);
+        document.getElementById('categorySelect').addEventListener('change', updateTaskDisplay);
+    </script>
+</body>
+</html>
